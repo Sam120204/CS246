@@ -1054,3 +1054,165 @@ When is copy ctor called:
 - Initialize an object from another of same type
 - Pass by value 
 - Return by value 
+
+```c++
+struct Node {
+  Node(int data, Node* next=nullptr): data{data}, next{next} {}
+};
+Node n {5, nullptr};
+Node m{6};
+Node p = 100; // implicit conversion; invodes the single arg ctor for Node
+
+string s = "Hello"; // single arg ctor for string that takes in a const char*
+//stad::String  const char*
+
+void f(Node n);
+f(Node {5});
+f(5) // arg 5 is converted into a Node
+```
+
+
+
+Why might you want to disable this?
+
+- Compi;er does conversion implicitly 
+- No warning or indication the conversion will occur
+- Potential to miss errors
+
+
+
+**<u>Makde the ctor explicit: (to make is disable single arg ctor)</u>**
+
+```c++
+struct Node {
+  explicit Node(int data, Node*next=nullptr): data{data}, next{next} {}
+};
+
+Node p = 4; //DOES NOT COMPILE
+f(4); // DOES NOT COMPILE
+//only
+Node p{4}; 
+f(Node {4});
+```
+
+
+
+**Destructors (dtors)**
+
+- Runs whenever <u>an object is destroyed</u>
+- when an object <u>goes out of scope</u> (stack allocated) or when <u>delete</u> is called on a ptr to that object (heap allocated)
+- Compiler provided dtor: calls dtor on all object fields
+- STeps
+  - Dtor body runs
+  - object fields have their dtors called in *reverse* declaration order
+  - *Later*
+  - Space is deallocated
+
+```c++
+Nodes: should write our own dtor
+Node *p = new Node{1, new Node{2, new Node{3, nullptr}}}; // p is in the stack pointing to "1" Heap 1->2->3X
+delete p; // still memory leak
+					// only delete "1", not NOdes 2 and 3
+// we need to write dtor - handle cleaning up rest of linked list focus
+
+struct Node {
+  ...
+  ~Node() {
+    delete next; // delete nullptr does nothing
+    						 // recursively deletes rest of the list, base case is delete nullptr
+  }
+};
+
+Node p {4, new Node {5, nullptr}};
+// Entire linked list is freed when p goes out of scope. 
+```
+
+
+
+**<u>Copy Assignment Operator</u>**
+
+```c++
+Student s {60, 70, 80};
+Student r = s; // copy ctor
+Student t{0, 0, 100};
+r = t; // r exists alrdy, and needs a 
+			 // copy assignment operator
+```
+
+- **<u>Assign</u>** one object to another of the same type
+- Compiler <u>provided copy assignment operator</u>; Does **<u>field-by-field assignemnt</u>**
+
+```c++
+Node n{1, new Node{3, new Node{3, nullptr}}};
+Node p{4, new Node {5, nullptr}};
+p = n; //leads to copy assignemnt operator will run
+
+   Stack           Heap
+n   "1"   ------>  "2" -> "3X"
+p   "1"   --------^ "5X" // "5X not freed - memory leak"
+     
+
+     
+struct Node {
+  Node& operator = (const Node& other) {
+    delete next; // purpose: delete "5X" above. delete an object will recursively called until delete nullptr
+    data = other.data;
+    next=other.next?new Node{*other.next}:nullptr;
+    return *this;
+  }
+};
+// support chained assignment: return type of operator "=" is Node&
+int a, b, c, d;
+a = b = c = d = 100; // d=100 returns d     d would be this, 100 would be other
+										 // c=d returns c       c would be this, d would be other
+										 // a=b returns b       
+
+n = n; // this will lead an issue cuz we delete all our own nodes by (delete next;) and try to copy them
+			 // self-assignment
+
+// so, we need self-assignment check:
+struct Node {
+  Node& operator = (const Node& other) {
+    if (this==&other) return *this;
+    delete next; // purpose: delete "5X" above. delete an object will recursively called until delete nullptr
+    data = other.data;
+    next=other.next?new Node{*other.next}:nullptr;
+    return *this;
+  }
+};
+
+?? if this still work?  MIDTERM QUESTION NEEDED TO THINK ABOUT: WORKS
+if (*this==&other) return *this;
+
+!!!
+// one more improvement: if we request memory with new, there is a chance it may fail. Better strategy, request memory before deleting Nodes.
+struct Node {
+  Node& operator = (const Node& other) {
+    if (this==&other) return *this;
+    Node* temp = other.next?new Node{*other.next}:nullptr; // better cuz we dont change the original code and will fail if temp not work
+    delete next; // purpose: delete "5X" above. delete an object will recursively called until delete nullptr
+    data = other.data;
+    next = temp;
+    return *this;
+  }
+};
+```
+
+```c++
+// Copy and Swap Idiom: Another way of writing copy assignment operator
+std::swap(a.b) <- <utility> // a gets b's value; b gets a's value
+struct Node {
+  void swap(Node& other) {
+    std::swap(data, other.data);
+    std::swap(next, other.next);
+  }
+};
+
+// deep copy
+Node& operator = (const Node& other) {
+  Node* temp{other};
+  swap{temp};
+  return *this;
+}
+```
+
