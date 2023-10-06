@@ -1216,3 +1216,161 @@ Node& operator = (const Node& other) {
 }
 ```
 
+Lec 9 - Move ctor/assignment, elision, operator overloading (revisited)
+
+**<u>Move ctor - Rvalues</u>**
+
+Recall: lvalues - long lasting, memory address that we can get with & (address-of)
+
+```c++
+Node oddsOrEvens() {
+  Node o {1, new Node{3, new Node{5,..., new Node{99, nullptr}}}};
+  Node e {2, new Node{4, new Node{6,..., new Node{100, nullptr}}}};
+  char c;
+  cin>>c;
+  return (c=='o')?o:e;
+}
+Node l = oddsOrEvens(); //returns by value (COPY CTOR)
+
+	stack				Heap
+o   1-------->3->5->7->...->99X  
+l   1-------->3->5->7->...->99X  
+    
+// Here, o will gone soon when it is out of scope, and nobody changes value in o, copy ctor takes time
+//    we copy 50 Nodes to create l. Then, o goes out of scope, and we delete those 50 NOdes we just copied from.   
+```
+
+Why copy Nodes just to delete roginals immediately after?
+
+- We can steal data from another object. So long as we know that object will no longer be used.
+- We need a way to determine if a paramter is an 
+  - lvalue (long-lasting, must copy), OR 
+  - an rvalue (temporary), then we can steal data.
+- MOVE CTOR !  
+
+```c++
+Node&& - this is an rvalue reference - binds to temporaries.
+We can overload ctor 
+Node(const Node&other) - copy ctor
+Node(Node&&other) - move ctor
+  
+struct Node {
+  Node(Node&& other):data{other.data}, next{other.next} {
+    other.next = nullptr;
+  }
+}
+
+memory diagram for the above code:
+o: 1X        3->5->7->...->99X  (1X is because we let other.next = nullptr;)
+l: 1--------⬆️ 
+```
+
+**<u>Move Assignment Operator:</u>**
+
+```c++
+Node n{1, new Node{2, new Node{3, nullptr}}};
+n = oddsOrEvens(); // Rvalue move assignment operator
+
+struct Node {
+  Node& operator=(Node&& other) {
+    swap(other);
+    return *this;
+  }
+};
+memory diagram for the above code:
+o: 1->2->3X  
+e: 2->4->6->8->...->100X  
+  
+After swap
+o: 2--⬇️ 2->3X  
+e: 1-----⬆️
+  		4->6->8->...->100X
+```
+
+If you write move ctor/move assignment operator - these are used instead of <u>**copies**</u> where possible. If you write copy ctor/assignment op, but no move version - copying version always used.
+
+
+
+**<u>Rule of Big 5</u>**
+
+- If you write one of: dtor, copy ctor, copy assignment op, move ctor, move assignment op, you should probably write all 5
+- Only write them if compiler provided versions are incorrect. Often write the big 5 for classes with ownership - classes that manage a resource (like memory)
+
+
+
+Elision:
+
+```c++
+vec getvec() {return {0,0}}
+vec v=getvec(); what happens? Only Basic ctor, no move/copy
+```
+
+- In certain cases, compiler can perform something called more/copy elision rather than constructing vec in getVec and moving it, simply write values into main stack frame. Can happen even if it changes output of program!
+
+```c++
+other Example:
+void useVec(vec v) {...}
+use vec({1,2}); // elision happens, one ctor is run, basic ctor
+```
+
+Not expected to know exactly all the places where e;ision may occur, must that it is possible
+
+
+
+**<u>Member Operators</u>**
+
+Note: Previously we wrote operator overloads outside structs. Operator=, we wrote as a method
+
+If we write operator overloads as methods, this becomes left-hand side parameter
+
+```c++
+struct vec{
+  int x,y;
+  vec operator+(const vec& other) {
+    return {x+other.x, y+other.y};
+  }
+  vec operator*(int k) {
+    return {x*k, y*k}; // this only supports v*k
+  } // to support k*v - must write a standalone function as before
+};
+
+```
+
+**<u>Advice</u>**: For arithmetic assignment, implement one using the other
+
+```c++
+vec& operator+=(vec& v1, const vec& v2) {
+  v1.x += v2.x;
+  v1.y += v2.y;
+  return v1;
+}
+
+vec& operator+(const vec& v1, const vec& v2) {
+  vec tmp{v1};
+  return tmp+=v2;
+}
+
+or
+  
+vec& operator+(vec& v1, const vec& v2) {
+  return v1+=v2;
+}
+```
+
+I/O Operators:
+
+```c++
+struct vec {
+  ostream& operator<<(ostream&out) {
+    return cout<<x<<" ";
+  }
+}; //wrong
+// this means vec<<ostream
+```
+
+I/O operators must be defined as standlone functions. Operator overloads that must be methods
+
+- Operator overloads that must be methods:
+  - operator=
+  - Operator[]
+  - operator->
