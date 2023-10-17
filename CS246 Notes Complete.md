@@ -1374,3 +1374,213 @@ I/O operators must be defined as standlone functions. Operator overloads that mu
   - operator=
   - Operator[]
   - operator->
+
+CS 246 - Lec 10
+
+Last time: Elision, member operators
+
+This time: Arrays of objects, const objects, static, 3-way comparison
+
+
+
+**<u>Arrays of Objects</u>**
+
+```c++
+struct vec {
+  int x, y;
+  vec(int x, int y):x{x}, y{y} {}
+};
+vec* vp = new vec[15]; //wont compile
+vec array[10]; //wont compile
+```
+
+When we create an array of objects, default ctor will run for each object in the array. No default ctor -> no compilation
+
+
+
+**<u>Solutions:</u>**
+
+1. Add a <u>**default constructor**</u> back, so it can be called for each element in the array. If no default ctor makes sense, then what?
+
+2. 
+
+   ```c++
+   // stack allocated arrays; give initial vectors
+   vec array[3] = {{1,2}, {3,4}, {5,6}};
+   ```
+
+   
+
+3. Use an array's of pointers
+
+```c++
+vec** vp = new vec*[15]; //Heap
+for (int i = 0; i < 15; ++i) {
+    vp[i] = new vec(0, 0);  // Now each pointer in the array points to a vec object on the heap
+}
+// vp[1] = *vp[i+1]
+
+vec * array[10]; // stack
+// compiler is allowed 
+array[0] = new vec(1, 2);  // Points to a heap-allocated vec
+vec v(3, 4);
+array[1] = &v;             // Points to a stack-allocated vec
+```
+
+
+
+**<u>Const Objects</u>**
+
+- Objects can be const. Used most commonly in the form of const lvalue references
+
+```c++
+const Student S{60, 70, 80};
+S.assns = 80; // will not compile
+cout<<S.grade()<<endl; // Does not compile
+// Because the compiler does not know whether or not S.grade() will modify the fields. Calling S.grade() with a const S is not allowed.
+Struct Student {
+  int assns, mt, final;
+  float grade() const; // This indicates that grade() will not change any fields.
+}
+
+float Student::grade() const {
+  return assns*0.4 + mt*0.2 + final*0.4;
+}
+constness is a part of the methods' signature - must appear in both interface and implementation
+
+  
+const Student S{60, 70, 80}; // Now will Compile
+cout<<S.grade()<<endl;
+// Now compiles, only must methods can be called on const objects.
+```
+
+- Imagine collecting stats on our program
+
+```c++
+Struct Student {
+  int assns, mt, final, calls;
+  float grade() const {
+    ++calls; // wont compile since it is const function
+    return assns*0.4+mt*0.2+final*0.4;
+  }
+};
+// Issue: Physical vs. logical constness
+Physical constness: Making sure that the bits that make up the object do not change.
+Logical constness: Making sure the "essence" or the fields and memory we care about do not change.
+  
+// Solution: Decalre calls as Mutable
+Struct Student {
+  int assns, mt, final;
+  mutable int calls; // This field may be changed, even for a const object or const method.
+};
+Advice: Use mutable sparingly, decreases usefulness of const
+```
+
+
+
+**<u>Static fields/Static Methods</u>**
+
+Issue: calls is tracked separately for each student
+
+What if I want it shared among all students?
+
+Declare a **<u>static field</u>** - Shared among all instances of a class
+
+```c++
+Struct Student {
+  inline static int numInstances = 0; // at the beginning of the program, keeps the variable to zero
+  Student(int assns, int mt, int final): assns{assns}, mt{mt}, final{final} {
+    ++numInstances;
+  }
+};
+// The inline keyword, in this context, tells the compiler that the variable can be defined in the header file and the definition can be shared across multiple translation units without violating the One Definition Rule (ODR). 
+Before g++20:
+// In the header file (.h or .hpp)
+struct Student {
+    static int numInstances;
+};
+
+// In the source file (.cpp)
+int Student::numInstances = 0;
+
+
+
+Student s{1, 2, 3};
+Student t{4,5,6};
+cout << Student::numInstances << endl; // prints out 2
+```
+
+- Static methods: called on the class itself, rather than any particular object - can only access static fields
+
+```c++
+Struct Student {
+  static void howMany() {
+    cout << numInstances << endl;
+  }
+};
+Student s{60,70,80};
+Student::howMany();
+
+This is a static member function of the Student struct called howMany(). Being static means this function can be called on the struct itself (i.e., Student::howMany()) without needing to instantiate an object of Student. This function, when called, prints the value of numInstances to the console.
+```
+
+
+
+3-Way COmparison
+
+- Recall: Comparing string in C;
+  - Strcmp(s4, s2);
+    - < 0 if s1<s2
+    - = 0 if s1 = s2
+    - greater than 0 if s1>s2
+
+In C++:
+
+```c++ 
+// 2 comparions instead of 1
+// Slower than the C version
+if (s1<s2) {
+  
+} else if (s1 == s2) {
+  
+} else {
+  
+}
+```
+
+Can we achieve this in C++? YES
+
+**<u>3-Way comparison operator</u>**: <=> // Spaceship operator
+
+```c++
+import <compare>
+String s1 = " ", s2 = " ";
+std::strong_ordering n = (s1<=>s2);	
+if (n < 0) {} // s1 < s2
+else if (n == 0){} // s1 == s2
+else if (n > 0){} // s1 > s2
+
+The class type std::strong_ordering is the result type of a three-way comparison that:
+Admits all six relational operators (==, !=, <, <=, >, >=).
+Implies substitutability: if a is equivalent to b, f(a) is also equivalent to f(b), where f denotes a function that reads only comparison-salient state that is accessible via the argument's public const members. In other words, equivalent values are indistinguishable.
+
+std::strong_ordering - this is a long type name.
+To avoid writing it out, use automatic type deduction,
+auto n = (s1<=>s2); //n gets the type of the expression on the RHS.
+```
+
+Ex:
+
+```c++
+Struct Vec {
+  int x, y;
+  auto operator<=>(const vec&other) const {
+    auto n = (x<=>other.x);
+    return (n==0)?y<=>other.y:n;
+  }
+};
+```
+
+- Having written <=> for Vecs, I can new do:
+  - v1<=>v2, v1!=v2, v1==v2, v1<v2. v1>v2, v1<=v2, v1>=v2;
+  - All of these are given for free!
