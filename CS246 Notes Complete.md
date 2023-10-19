@@ -1584,3 +1584,212 @@ Struct Vec {
 - Having written <=> for Vecs, I can new do:
   - v1<=>v2, v1!=v2, v1==v2, v1<v2. v1>v2, v1<=v2, v1>=v2;
   - All of these are given for free!
+
+CS 246 - Lec 11
+
+Last time: const objects, static, <=>
+
+This Time: <=>, encapsulation, Classes, Iterator
+
+```c++
+struct Vec {
+  int x,y;
+  auto operator<=>(const vec& other) const {
+    auto n = x<=> other.x;
+    return n==0? y<=>other.y:n;
+  }
+};
+```
+
+If all your operator <=> does is compare fields in declaration order - we can "default" this:
+
+```C++
+struct Vec {
+  int x, y;
+  auto operator<=>(const vec&other) const = default;
+};
+// This line declares the spaceship operator for the Vec struct and defaults its implementation. There's a typo: vec should be Vec.
+By using = default, you're telling the compiler to generate a default implementation of the spaceship operator. The default implementation will perform a member-wise comparison in the order that the members are declared in the struct.
+
+For the Vec struct, this means:
+
+It will first compare the x values of the two Vec objects.
+If the x values are the same, it will then compare the y values.
+The default implementation is a concise and expressive way to define comparison operations for simple structs/classes, especially when the desired behavior is just to compare the members in the order they're declared.
+
+Using = default for the spaceship operator is particularly useful for structs like Vec where the desired behavior is straightforward member-wise comparison. It eliminates boilerplate and reduces the potential for errors in custom implementations.
+```
+
+
+
+Consider a case there = default is not the correct approach: comparing Nodes (<u>Linked Lists</u>) Default would **compare memory addresses** - we want to compare list contents.
+
+```c++
+struct Node {
+  auto operator<=>(const Node& other) const {
+    auto n = data<=>other.data;  // Compare the data members of the nodes
+    if (n!=0 || (!next&&!other.next)) return n; // If data is different or both nodes don't have a next node, return the comparison result
+    if (!next && other.next) return std::strong_ordering::less; // If current node doesn't have next but other does, current is less
+    if (next && !other.next) return std::strong_ordering::greater; // If current node has next but other doesn't, current is greater
+    return *next<=>*(other.next);  // If both nodes have a next node, compare the next nodes
+  } // operator <=>
+}; //Node
+// <compare>
+std::strong_ordering::less: Represents that the left-hand operand is less than the right-hand operand.
+std::strong_ordering::equal: Represents that the left-hand operand is equal to the right-hand operand.
+std::strong_ordering::greater: Represents that the left-hand operand is greater than the right-hand operand.
+```
+
+
+
+**<u>Encapsulation</u>**:
+
+```c++
+struct Node {
+  int data;
+  Node* next;
+  Node(int data, Node* next):data{data}, next{next} {}
+  // big 5;
+};
+Node n {1,nullptr};
+Node m {2, &n};
+Node o {3, &n};
+
+// Destructor Runs:
+When n is freed, no issue;
+// m's dtor runs, delete next = &n;
+// Deleting stack allocated memory, crash.
+
+// o's dtor runs -> delete next. Double delete; and deleting stack allocated memory.
+```
+
+- Assumptions we made when writing BIG 5:
+
+  - next is always heap allocated, or nullptr.
+  - No nodes share between  linked lists.
+
+  These are **<u>invariants</u>** - this property you expect to hold true, whenever using an object of a particular type
+
+- Issue: Invariants can be easily broken by the user.
+
+- Introduce: **<u>Encapsulation</u>** - Classes should be treated as a capsule, or a "black box". Clients should not have access to underlying data, should interact solely via your methods.
+
+- Access specifiers allow us to control how a user accesses data from our classes.
+
+```c++
+struct Vec {
+  private: // private fields and methods only be accessed / called from within Vec methods
+  	int x, y;
+  public: // can be accessed / called from anywhere.
+  	Vec(int z, int y);
+  	int getX() const {return x;}
+};
+```
+
+- Default specifier for structs is public
+
+  - Preferred: keep data private by default - **<u>use class keyword</u>**
+
+  - ```c++
+    class Vec {
+     int x, y; // private by default, inaccessible
+     public:
+      vec(int x, int y);
+      vec operator+(const vec& other) const;
+    };
+    ```
+
+- Only difference b/w classes and structs:
+  - Structs are public by default, classes are private by default.
+
+Revisit Linked List, ensure invariants are always enforced.
+
+```c++
+// List.cc 
+export module List;
+export class List {
+  Struct Node; // private nested class, to be defined in impl file. declaration
+  Node* head = nullptr;
+  public:
+  	~List();
+  	int ith(int i) const;
+  	void addToFront(int n);
+};
+
+// List-impl.cc
+Struct List::Node {
+  int data;
+  Node* next;
+  ..
+  ~Node() {delete next;}
+};
+
+void List::addToFront(int n) {
+  this->head = new Node{n, head};
+}
+List::~List() {delete head;}
+
+int List::ith(int i) const {
+  Node* cur = head;
+  for (int j = 0; j < i; j++) cur = cur->next;
+  return cur->data;
+}
+```
+
+Problem: Now takes *O(n^2)* time to loop through our List - not good!!!
+
+- How do we maintain encapsulation while also getting fast iteration?
+
+  - **<u>Iterator pattern</u>**
+
+  - Iterator is an example of a design pattern - 
+
+    - effective solution to a common problem
+
+  - create a class that acts like an abstraction of a ptr:
+
+    - allows us to walk the linked list, while maintaining encapsulation.
+
+  - ```c++
+    class List {
+      struct Node;
+      Node* head = nullptr;
+      public:
+      	class Iterator {
+          Node* cur;
+          public:
+            Iterator(Node* cur): cur{cur} {}
+            Iterator& operator++() {
+              cur = cur->next;
+              return *this;
+            }
+    
+            bool operator!=(const Iterator&other) const {
+              return cur != other.cur;
+            }
+            int operator*() const {
+              return cur->data;
+            }
+        }//ends Iterator
+      Iterator begin() const {
+        return Iterator {head};
+      }
+      Iterator end() const {
+        return Iterator{nullptr};
+      }
+    };
+    ```
+
+    ```c++
+    int main() {
+      List l;
+      l.addToFront(1);
+      l.addToFront(2);
+      l.addToFront(3);
+      for (List::Iterator it=l.begin(); it!=l.end(); ++it) {
+        cout << *it << endl;
+      }
+    }
+    ```
+
+    
