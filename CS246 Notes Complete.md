@@ -1792,4 +1792,182 @@ Problem: Now takes *O(n^2)* time to loop through our List - not good!!!
     }
     ```
 
+    If we have the following:
     
+    - A class with methods begin and end which returns some "Iterator type"
+    
+    - This type supports ++, != and *
+    
+    - Then we get range-based for loop syntax
+    
+      - ```c++
+        for (int n:l) { // This copies each int in the list
+          cout << n << endl;
+        }
+        ```
+    
+    - If we want modification:
+    
+      - ```c++
+        for (int& n:l) {
+          n*= 2;
+          cout << n << endl;
+        }
+        ```
+
+
+
+Slight encapsulation problem:
+
+```c++
+List::Iterator it {nullptr};
+// User should only create Iterators via begin and end
+// Solution: make Iterators ctor private. Then, user cannot create Iterators, but also List cannot create iterators. Give List privileged access to call the provate constructor.
+Class List {
+  Struct Node;
+  Node* head;
+  Public:
+    Class Iterator {
+      Node *cur;
+      Iterator(Node* cur): cur{cur} {}
+    Public:
+      ..
+      friend class List; // can be placed anywhere in Iterator
+// friend class List;: This line is critical. It declares the outer List class as a friend of the Iterator class.
+    };
+    Iterator begin() {
+      return Iterator {head};
+    }
+    Iterator end() {
+      return Iterator {nullptr};
+    }
+};
+// Because Iterator declared List as a friend, List may access Iterator's private fields and methods
+```
+
+- A `friend` class has access to the private (and protected) members of the class in which it's declared as a friend. This essentially breaks the usual encapsulation rules of C++.
+- The line `friend class List;` inside the `Iterator` class declares the outer `List` class as a `friend` of the `Iterator`. This means that the `List` class can access the private (and protected) members of the `Iterator` class.
+- The comment provided in the code indicates the design intention. The designer of these classes wants the user to create instances of `Iterator` only via the `begin` and `end` methods of the `List` class and not directly (to perhaps prevent misuse or ensure the iterator is always in a valid state). To achieve this, the constructor of `Iterator` is made private. Normally, this would mean that no one, not even the `List` class, could create instances of `Iterator`. But with the `friend` declaration, the `List` class can.
+- Rather than making friends - use **access/mutator** methods; (getters/setters)
+
+```c++
+Class Vec {
+  int x, y;
+public:
+  Vec(int x, int y):x{x}, y{y} {}
+  int getX() const {return x;}
+  void setX(int a) {x=a;}
+};
+```
+
+What about operator<<? Standalone function, but still want access to private fields/
+
+- Use getX, getY if defined
+
+  - ```c++
+    std::ostream& operator<<(std::ostream& os, const Vec& v) {
+        os << "(" << v.getX() << ", " << v.getY() << ")";
+        return os;
+    }
+    
+    ```
+
+    
+
+- Declare a friend function
+
+  - ```c++
+    Class Vec {
+      int x, y;
+    Public:
+      friend ostream& operator<<(ostream&, const Vec&); // declare a friend function. This fn can access private dield methods
+    };
+    ```
+
+  - ```c++
+    ostream& operator<<(ostream&, const Vec&) {
+      return out << v.x << " " << v.y;
+    }
+    ```
+
+Equality Revisited:
+
+List class encapsulation Node
+
+We can now keep track of extra info about our List, e.g. length.
+
+Strategies to implment a length method:
+
+1. Iterate through Nodes, count number - return   O(n)
+2. O(1) time: keep a length field, incrementation addToFront is called, return on length() called.
+
+
+
+Now: can optimize spaceship comparison:
+
+- If we write (l1 <=> l2) == 0, this checks if two lists are equal to each other. 
+  - Takes O(n) time
+  - Shortcut for == comparison, two Lists of different length cannot be equal
+
+```c++
+Class List {
+  Node* head;
+  int length;
+Public:
+  auto operator<=>(const List& other) {
+    if (!head && !other.head) return std::strong_ordering::equal;
+    if (!head && other.head) return std::strong_ordering::less;
+    if (head && !other.head) return std::strong_ordering::greater;
+    return *head <=> *other.head;
+  }
+  bool operator==(const List&)const {
+    if (length!=other.length) return false;
+    return (*this<=>other) == 0;
+  }
+};
+```
+
+Now:
+
+- If we write l1 == l2: we use == operator, more efficient - checks to see if lengths are equal. 
+- Otherwise, !=, <=, >=, >, < still use spaceship operator. Allows us to optimize equality checks.
+
+
+
+**<u>System Modelling:</u>**
+
+Defn: View classes relationships between them in a graphical way so as to communicate about large programs
+
+```c++
+UML diagrams, (Unified Modelling Language)
+
+       Vec                   <- Name
+- x: Integer            <- Fields(optional): - means private; + means public
+- y: Integer
+__________________________________________________
+
++getX: Integer     <- Methods (optional)
++getY: Integer
+```
+
+
+
+**<u>Relationships between Classes</u>**
+
+- Composition: Nesting one object with another.
+
+  - ```c++
+    Class Basis {
+      Vec v1, v2; // Vec is composed with Basis
+    };
+    ```
+
+  - Generally if class B is composed with class A:
+
+    - If A dies, then B dies // B is Vec, A is Basis
+    - If A is copied so is B (deep copy)
+    - B has no independent existence in the program
+    - Also called an "owns-a" relationship
+      - Basis "owns" 2 vectors
+    - Implementation: Typically done via object fields, although not necessarily
+
