@@ -1971,3 +1971,196 @@ __________________________________________________
       - Basis "owns" 2 vectors
     - Implementation: Typically done via object fields, although not necessarily
 
+Let 13
+
+Composition: If A "owns-a" B, then
+
+- A dies -> B dies
+- A copied -> B copied (deep copy)
+- B has no independent existence apart from A
+
+Aggregation: If class A "has-a" B, then
+
+- A dies -> B keeps living
+- A is copied -> B is not copied (shallow copy)
+- B may have independent existence outside A
+
+```c++
+class Student {
+  int id;
+  University* myUni;
+public:
+  Student() {...}
+}
+```
+
+```c++
+int main() {
+  Unievrsity uw{..};
+  Student s{1, &uw};
+  Student t{2, &uw};
+}
+```
+
+**Consider Linked List, implemented via ptrs, but is a composition relationship. Implementing big usually means **
+
+**owernship and composition**
+
+
+
+**<u>Specialization</u>**:
+
+Imagine a program to manage and catalogue library books. We will manage Books, Texts, and Comics
+
+```c++
+class Book {
+  string title, author;
+  int length;
+public:
+  Book(...) {...}
+};
+
+class Text {
+  string titile, author;
+  int length;
+  string topic;
+public:
+  Text(...) {....}
+};
+
+Comic (UML form)
+-----------------
+- title: string
+- author: string
+- length: Integer
+- hero: string
+  
+Question: What is I want an array of all types of Books
+  - Should store Texts, Books, and Comics
+```
+
+1. Use void*s, which can point to anything
+
+   - Not type safe
+
+2. Use a union type
+
+   - ```c++
+     union BookType {
+       Book* b; // stores one of these types
+       Text* t; // stores one of these types
+       Comic* c; // stores one of these types
+     };
+     BookType u;
+     u.b = new Book{...};
+     cout << u.t->type << endl; // u.t is not safe; undefined
+     ```
+
+**<u>Issue</u>** is that the compiler is not aware of the relationship; A comic is a type of Book.
+
+A text "is-a" Book; Specialization relationship or "is-a". Implemented in C++ via public inheritance.
+
+```c++
+class Book { // Basic or Superclass
+  string titile, author;
+  int length;
+public:
+  Book(string title, string author, int length): title{title}, author{author}, length{length} {}
+}
+
+class Text:public Book { // means Text is a type of book
+  										   // derived subclasses
+  string topic;
+public:
+  Text(...) {..}
+  
+};
+
+class Comic:public Book {
+  string hero;
+..
+public:
+  Comic(..) {}
+};
+```
+
+- Text and Comic inherit from Book, this means that they have titile, author, and length fields
+- A subclass inherits **all fields+methods** from its superclass. title, author, length are private in Book
+- title, author, length are only accessible in Book, not subclasses of Book
+
+```c++
+class Text:public Book {
+  string topic;
+public:
+  Text(string title, string author, int length, string topic): // DOES NOT WORK
+  title{title}, author{author}, length{length}, topic{topic} {}
+};
+```
+
+**Why not work?**
+
+- Titile, author, length are private in Book, cannot be changed in Text. AND MIL can only be used for your class's fields
+- Object creation Sequence
+  - Space is allocated
+  - Superclass ctor runs
+  - Fields are initialized via MIL
+  - ctor body runs
+
+In step 2, superclass ctor is called. If you do not specify the args for superclass ctor, default ctor will be used. If that does not exist -> wont compile
+
+```c++
+class Text:public Book {
+  string topic;
+public:
+  Text(string title, string author, int length, string topic): 
+  Book{title, author, length}, // step 2 - superclass
+  topic{topic} {} // step3
+};
+```
+
+
+
+Generally, it is a good idea to keep superclass fields, private to subclasses.
+
+If we do want to give just subclasses access; use protected=>accessible in class and subclasses, nowhere else
+
+
+
+Consider adding multple authors to Texts:
+
+```c++
+class Book {
+  protected:
+  	string title, author;
+  	int length;
+  public:
+  	Book() {}
+};
+
+class Text:public Book {
+  string topic;
+public:
+  Text() {}
+  void addAuthor(string a) {author+=a;} // protected can be accessed
+};
+```
+
+Preferred: use protected mutators
+
+```c++
+class Book {
+  string title, author;
+  int length;
+protected:
+  void setAuthor(string a) {author=a;} // may only be called from subclasses
+};
+
+Specialization "is a" in UML
+  Book
+   ^
+   |     // Speicialization: public inheritance in C++
+ -- --
+ |    |
+Text  Comic
+```
+
