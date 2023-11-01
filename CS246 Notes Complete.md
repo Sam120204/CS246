@@ -2164,3 +2164,186 @@ Specialization "is a" in UML
 Text  Comic
 ```
 
+CS246 - Lec 14
+
+Recall: we want a bookcase, an array of Books that may behave different depending on if it is a Book/ Text/ Comic
+
+```c++
+Book: heavy if > 200 pages
+
+Text: heavy > 500 pages
+
+Comic: heavy > 30 pages
+  
+class Book {
+protected:
+  string title, author;
+  int length;
+public:
+  Book(..) {..}
+  bool isHeavy() const {
+    return length > 200;
+  }
+};
+
+class Text: public Book {
+  string topic;
+public:
+  Text(...) {..}
+	bool isHeavy() const {
+    return length > 500;
+  }
+};
+
+Book b{"..", "..", 300};
+Text t{"..", "..", 300, "topic"};
+b.isHeavy(); //return true
+t.isHeavy(); //return False
+
+Book b = Text{"..", "..", 300, "topic"};
+// This is allowed due to public inheritance, a Text is a type of Book
+****b.isHeavy??? return True
+- After assigning b to the Text, we lost information that b was a Text, b is from that point treated as a Book.
+- This is running compiler provided book move ctor, which only moves title, author, length. (Same thing happens w/copies)
+  
+
+Book b        Text
+title					title					
+-----				  -----
+author				author
+-----         -----
+length				length
+							-----
+  						topic
+  
+object slicing - ctor runs for a superclass and chops off subclass fields
+```
+
+- What if we use ptrs instead?
+
+```c++
+Text t{"..", "..", 300, "topic"};
+Book* bp = &t;
+bp->isHeavy(); 
+return True;
+```
+
+- To get isHeavy to use the Text definition even it pointed to by a Book - must use a <u>virtual method</u>.
+
+```c++
+class Book {
+  ...
+public:
+  ...
+    virtual bool isHeavy() const {return length > 200;}
+};
+
+class Text:public Book {
+  ...
+public:
+  ...
+	bool isHeavy() const override {return length > 500;}
+};
+```
+
+- Definition:
+  - static type of a ptr - given an LHS in the type declaration: <u>Book*</u> pb = &t; (underline is static type)
+  - dynamic type: what is the type of the "underlying" object.
+
+1. If not using via ptr or reference: we always call the **method definition** based on the **static type**
+2. Using via ptr or ref?
+   1. Non-virtual method -> use the static type 
+   2. virtual method -> use dynamic type
+
+```c++
+Text t{"..", "..", 300, ".."};
+Book b{"..", "..", 350};
+Text* pt = &t;
+Book* pb = &t;
+
+t.isHeavy(); // False - static type
+b.isHeavy(); // True - static type
+pt->isHeavy(); // False 
+pb->isHeavy(); // False - using via ptr -> using virtual method -> using dynamic type
+```
+
+1. `pt->isHeavy();` - This uses the pointer `pt` which is of type `Text*`. When we use a pointer to call a virtual function, C++ uses dynamic dispatch to determine the actual type of the object. In this case, `pt` points to a `Text` object, so the overridden `isHeavy` in `Text` is called. This will again check if 300 is greater than 500. It's not, so it returns `False`.
+2. `pb->isHeavy();` - This is the most interesting case. The pointer `pb` is of type `Book*`, but it's actually pointing to a `Text` object (`t`). When calling a virtual function using a pointer, C++ determines the method to call based on the actual object the pointer points to, not the type of the pointer. Here, since `pb` is pointing to a `Text` object, the overridden `isHeavy` in `Text` is called. This again checks if 300 is greater than 500. It's not, so it returns `False`.
+
+- Bookcase example:
+
+```c++
+Book* myBooks[20];
+myBooks[0] = new Text{..};
+myBooks[1] = new Comic{..};
+...
+for (int i = 0; i < 20; ++i) {
+  cout << myBooks[i]->isHeavy() << endl; // use dynamic type
+}
+```
+
+- What does override do in Text::isHeavy?
+
+Nothing in terms of program execution; Checks at compile time that superclass method is actually virtual
+
+This is an example of polymorphism - "many forms" - superclass being able to represent multiple subclass types. We have seen this; ifstream is-a istream;
+
+
+
+<u>Destructions revisited</u>
+
+```c++
+class X {
+  int* n;
+public:
+  X(int size):n{new int[size]};
+  ~X() {delete[] n;}
+};
+
+class Y:public X{
+  int* m;
+public:
+  Y(int size1, int size2):X{size1}, m{new int[size2]} {}
+  ~Y() {delete[] m;}
+};
+X xobj {5};
+Y yobj {5,10};
+X* xp = new X{5};
+Y* yp = new Y{5,10};
+
+X* xptoy = new Y{5,10};
+delete xp;
+delete yp; // non-virtual; static type
+delete xptoy; Leaks!! we want to run all dtors, not only superclass' dtor
+```
+
+Object destruction Sequence
+
+1. Dtor body runs
+2. Object fields have dtors called in reverse declaration order
+3. superclass dtor runs (*new*)
+4. space reclaimed
+
+- Why does delete xptoy leak memory?
+  - calls dtor on underlying object --- that is a method!
+  - dtor is non-virtual -> use static type
+  - we call x's dtor instead of Y's for xptoy, leaking memory.
+
+- Solution: Make x's dtor virtual 
+
+```c++
+class x {
+  int* n;
+public:
+  virtual ~X() {delete[] n;}
+  X(..) {..}
+};
+```
+
+- If you knew a "Class may be subclassed", **<u>ALWAYS</u>** make its dtor virtual
+- If you know a class will **<u>NEVER</u>** be subclassed, make compiler enforce it via final
+
+```c++
+class C final {} // wont compile if C is subclassed
+```
+
