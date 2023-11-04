@@ -2347,3 +2347,215 @@ public:
 class C final {} // wont compile if C is subclassed
 ```
 
+```c++
+class Student {
+public:
+ vitual int fees() const; 
+};
+
+class Regular:public Student {
+public:
+  int fees() const override;
+};
+
+class Coop:public Student {
+public:
+  int fees() const override;
+};
+```
+
+In my program, I will create regular and coop student objects. Student feees is declared, how should we implment it. Ideally, no implementation, best to have the compiler enforce that only regular and coop students are created.
+
+Solution:
+Define Student::fees as pure virtual:
+
+```c++
+class Student {
+  virtual int fees() const = 0; // pure virtual
+}
+
+// pure virtual is organized subclass and dont need to implement this function
+```
+
+- Pure virtual methods are allowed to not have an implementation. Any class that defines a pure virtual method cannot be instantiated. 
+
+Student S; // wont be compile
+
+
+
+- Student is now an "abstract class",
+- Subclasses of an abtract class are also abstracted unless they provide an implementation for all inherited pure virtual methods. (<u>Regular and Coop subclasses need to provide implementation for fees() function</u>), then they are concrete.
+- The point of abstract classes is to **<u>organize</u>** subclasses.
+
+```c++
+class Student {// abstract class
+protected:
+  int numCourses;
+public:
+	virtual int fees() const = 0; 
+};
+
+class Regular:public Student { // concrete now -> it has implementation of fees() function
+public:
+  int fees() const override {return 600* numcourses};
+};
+```
+
+- In UML, represent abstract classes and pure virtual methods via italics.(or use ** instead)
+
+Ex:
+
+```c++
+*Student*
+----------
++*fees(); Integer*
+```
+
+
+
+- Revisiting Big 5 with inheritance
+
+```c++
+class Book {
+  string title, author;
+  int length;
+public:
+  big 5
+};
+
+class Text{
+  string topic;
+public:
+  // use compiler provided big 5;
+};
+Text t1{...}, t2{...};
+t1 = t2; //compiler provided works here, t1's fields get the values of t2's fields;
+
+
+// Lets see compiler provided big 5
+// Copy ctor
+Text::Text(const Text& other):Book{other}, topic{other.topic} {} // take other as a Text reference "other" seen as a Book reference and do the copy ctor
+
+// move ctor
+Text::Text(Text&& other): Book{std::move(other)}, topic{std::move(other.topic)} {}
+
+Above: If we were to call Book{other}, this would do copy title, author, length, rather than move then, why??
+- Other although an rvalue reference, but in the function, it is an lvalue because wont die within the line, only disappear when curly brace seen;
+- lvalues invoke copy sementics, we use std::move to force something to be treated as an rvalue
+  
+  
+// copy assignment operator
+Text& Text::operator=(const Text& other) {
+  Book::operator=(other); // this will take text reference treated as a book reference and call Book's operator=
+  											  // if not write Book::, it will get recurrsion to call the function
+  topic = other.topic;
+  return *this;
+}
+
+//move assign operator
+Text& Text::operator=(Text&& other) {
+  Book::operator=(std::move(other)); //making it rvalue
+  topic = std::move(other.topic);
+  return *this;
+}
+```
+
+Now consider:
+
+```c++
+Text t1{"Alias", "CLRs", "1000", "CS"};
+Text t2{"Shakespeare", "Mr. English", 2000, "English"};
+
+Book& r1 = t1;
+Book& r2 = t2;
+r1 = r2; // what happens?
+				 // reference cannot be assigned necessary
+// Operator equal is non-virtual, we use static type, will call book assignment operator
+
+t1 now contains:
+"Shakespeare", "Mr. English", 2000, "CS" // because in Book has no "topic" field. "English" not changing to "CS"
+```
+
+- The above is **partial assignment**, cause not all the fields in Book superclass
+  - this is because we use static type. we call Book::operator=
+  - we need to use dynamic type, using Text::operator=
+  - <u>So, we need to make Book::operator= virtual</u>
+
+```c++
+class Book {
+  string titile, author;
+  int length;
+public:
+  virtual Book& operator=(const Book& other);
+};
+
+class Text:public Book {
+  string topic;
+public:
+  Text& operator=(const Text& other) override; // make sure the method overrides that in the superclass
+  // However, this is not a valid override. argument is (const Text& other), in superclass, it is not
+  // we are allowed to override the subclass pointing to a reference/ptr
+  // issue is argument type!!!!!!!!!!
+  // args must match eaxtcly superclass.
+  need to change to:
+	Text& operator=(const Book& other) override; // OK!
+};
+
+// This allows:
+Text t1{...};
+t1 = Book{...};
+t1 = Comic{...};
+// this compiles, bad. we should  not assign a comic to a book.
+// This is mixed assignemnt 
+```
+
+- Conclusion:
+
+  - If operator= is non-virtual: **partial assignment**
+  - If its virtual, we get **mixed assignment**
+
+  - Solution: restructure class hierarchy 
+  - Advice: **<u>Make superclasses abstract</u>** 
+
+```c++
+					*AbstractBook*
+               ^
+               |
+        ----------------
+        |			 |			  |
+     regular  Text    comic
+```
+
+```c++
+class AbstractBook {
+  string title, author;
+  int length;
+protected:
+  AbstractBook& operator=(const AbstractBook& other) = default; // will set title{title}, author{author}, length{length}
+public:
+  AbstractBook() {...}
+  virtual ~AbstractBook()=0; // use dtor as pure virtual to make a class abstract if no other method makes sense
+};
+
+class Regular:public AbstractBook {
+public:
+  Regular& operator=(const Regular&other) {
+    AbstractBook::operator=(other);
+    return *this;
+  }
+};
+... same for text and comic
+```
+
+Methods assignment - makes sense. Text can only 
+
+Partial assignment: 
+
+```c++
+Text t1{}, t2{}
+AbstractBook& r1 = t1;
+AbstractBook& r2 = t2;
+//what if
+r1 = r2; // no longer compile because we try to call AbstractBook::operator= outside the class and it is protected
+```
+
