@@ -2559,3 +2559,200 @@ AbstractBook& r2 = t2;
 r1 = r2; // no longer compile because we try to call AbstractBook::operator= outside the class and it is protected
 ```
 
+CS246 - Lec16
+
+```c++
+class  AbstractBook {
+  ...
+public:
+  virtual ~AbstructBook() = 0;
+}
+```
+
+- In some cases, we must provide an implementation for pure virtual methods. Namely, if we call pure virtual method, and, Text, Comic, Real book all call superclass dtor.
+- Implement AbstractBook;s dtor.
+
+```c++
+AbstractBook::~AbstractBook() {}
+```
+
+- **Templates**: Consider List class again:
+
+```c++
+class List {
+  struct Node {
+    int data;
+    Node* next;
+  }
+  Node* head;
+public:
+  class Iterator {
+    ...
+    int& operator*() const;
+  }
+  int ith(int i) const;
+  void addToFront(int n);
+};
+```
+
+- What if we want a List of strings, or Students. We could copy/paste contents - this is not an effective solution. Instead - use a **template**
+
+```c++
+template<typename T> class List {
+  struct Node {
+    T data;
+    Node* next;
+  };
+  Node* head;
+public:
+  class Iterator {
+    ...
+    T& operator*() const;
+  };
+  T ith(int i) const;
+  void addToFront(const T& n);
+};
+
+List<int>l;
+l.addToFront(2);
+l.addToFront(3);
+
+List<string>ls;
+ls.addToFront("hello");
+
+for (List<int>::Iterator it = l.begin(); it != l.end(); ++it) {
+  cout << *it << endl;
+}
+List<List<int>>l3;
+l3.addToFront(l)
+```
+
+- **<u>Templates</u>** are just as fast at runtime as writing custom versions of stringList, intList, StudentList, etc.
+- At compile-time, copies of the class are created for each type T it is used with, then compile as normal.
+
+
+
+**<u>Standard Template Library</u>**
+
+- Collection of useful templated classes.
+
+- ```c++
+  std::vector, found in <vector>, resizable array
+  Vector<int> v{4,5}; //array containing 4,5
+  v.emplace_back(6); // contains 4,5,6
+  v.emplace_back(7) // contains 4,5,6,7; auto allocate memory
+  ```
+
+  - **Note**: 
+
+  ```c++
+  vector<int> v(4,5); // contains 5, 5, 5, 5
+  
+  // type deduction exists
+  vector w {1,2,3}; // int is inferred from list
+  
+  // Loop
+  for (int i = 0; i < v.size();++i) { //.size() returns sized vector
+    cour << v[i] << endl; //gets ith element
+  }
+  
+  for (vector<int>::iterator it=v.begin(); it != v.endl(); ++it) {
+    cout << *it << endl;
+  }
+  
+  for (int n:v) cout<<n<<endl;
+  
+  // Loop in reverse:
+  for (vector<int>::reverse_iterator it = v.rbegin(); it != v.rend(); ++it) {
+    cout << *it << endl;
+  }
+  
+  v.pop-back() // removes final element
+  v.erase(it) // erases element pointed to by iterator it;
+  
+  !!!careful using v.erase() in a loop
+    for (auto it = v.begin(); it != v.end(); ++it) {
+      if (*it == 5) v.erase(it); // DOESNOT WORK!!
+    }
+  // ex: 4 5 5 6 // the second 5 is not erase
+  
+  !!!Correct way!!!
+    for (auto it = v.begin(); it!=v.end();) {
+      if (*it == 5) v.erase(it);
+      else ++it;
+    }
+  
+  !!! Recommended to use vectors instead of new[] and delete[] - safer!!!
+  !!! Vectors are guaranteed to be implemented using arrays!!!
+  ```
+
+
+
+**<u>Design Patterns</u>**
+
+- In general, we would like to program to interfaces instead of implementations. 
+- We use <u>abstract classes to provide methods</u> which subclasses may customuze behavior of
+
+```c++
+class AbstractIterator {
+public:
+  virtual int& operator*() const = 0; // sets to pure virtual
+  virtual AbstractIterator& operator++() = 0;
+  virtual bool operator!=(const AbstractIterator& other) const = 0;
+  virtual ~AbstractIterator() {}
+}
+
+class List {
+  ...
+public:
+  class Iterator:public AbstractIterator { // inherit from AbstractIterator
+    ...
+  }
+};
+
+class Tree {
+  ...
+public:
+  class Iterator:public AbstractIterator {
+    ...
+  }
+};
+
+void foreach(AbstractIterator& start, AbstractIterator& end, void(*f)) (int)) {
+  while (start != end) {
+    f(*start);
+    ++start;
+  }
+}
+```
+
+- Foreach is programmed using AbstractIterator's interface. <u>The behavior is customized by subclasses</u>. Writing new subclasses does not require any changes to foreach
+
+
+
+**<u>Decorator Pattern</u>**
+
+Problem: Add/remove functionality at runtime;
+
+Example: Consider GUI - windowing system
+
+WE want
+
+- Basic window
+- Tabs (on/off)
+- Scrollbar (on/off)
+- Bookmarks (on/off)
+- If we create a window superclass and subclass for different window types.
+
+2^n subclasses: n is the number of teggleable features
+
+Instead use decorator pattern![IMG_7736](/Users/samzhong/Downloads/IMG_7736.jpg)
+
+```c++
+//This acts like a Linked List of functionality contrtecomponent describes default behaviour eg. BasicWindow concrete decorators augment functionality, using rest of the list
+Components* -> Basic Window
+
+//Add tabs:
+Components* -> Tabs -> Basic Window
+```
+
