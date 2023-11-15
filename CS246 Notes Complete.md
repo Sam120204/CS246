@@ -2756,3 +2756,383 @@ Components* -> Basic Window
 Components* -> Tabs -> Basic Window
 ```
 
+CS246 - Lec 17![IMG_7744](/Users/samzhong/Downloads/IMG_7744.jpg)
+
+Consider making a pizza application. Use decorator pattern to calculate price and print a description.![IMG_7745](/Users/samzhong/Downloads/IMG_7745.jpg)
+
+```c++
+                        *Pizza*
+                        --------
+                        +*Price(); float*
+                        +*desc(); string*
+															|
+        ----------------------------------------------------
+				|																								   |
+CrustAndSauce (Concrete)															*Decorator*
+--------------																						 |
++price(): float																----------------------------
++desc(): string																|            |							|
+                          								Topping			Stuffedcrust 		Dipping Sauce
+                          								+price(); float
+                          								+desc(); string
+```
+
+```C++
+class Pizza {
+public:
+  virtual float price() const = 0;
+  virtual string desc() const = 0;
+  virtual ~Pizza() {}
+};
+
+class CrustAndSauce:public Pizza {
+public:
+  float price() const override {return 7.99;}
+  string desc() const override {return "pizza";}
+};
+
+class Decorator:public Pizza { // Decorator still abstract!: cuz it did not implment price or desc methods
+protected:
+  Pizza* next;
+public:
+  Decorator(Pizza* p): next{p} {}
+  ~Decorator() {delete next;}
+};
+
+class Topping:public Decorator {
+  string the-topping;
+public:
+  Topping(string t, Pizza* p): Decorator{p}, the_topping{t} {}
+  float price() const override{return 0.99+next->price();}
+  string desc() const override{return next->desc()+"with"+the-topping;}
+};
+
+class Stuffedcrust:public Decorator {
+public:
+  Stuffedcrust(Pizza* p): Decorator{p} {}
+  float price() const override{return 1.5+next->price();}
+  string desc() const override{return next->desc()+"with Stuffedcrust";}
+}
+
+// acts like linked list
+Pizza* myPizza = new CrustAndSauce{};
+myPizza = new Topping{"pepperoni", myPizza};
+myPizza = new Stuffedcrust{myPizza};
+delete myPizza; // using dynamic type
+
+delete myPizza; // Points to Stuffedcrust
+    -> ~Stuffedcrust() (implicit, since not defined)
+        -> ~Decorator()
+            -> delete next; // Points to Topping
+                -> ~Topping() (implicit, since not defined)
+                    -> ~Decorator()
+                        -> delete next; // Points to CrustAndSauce
+                            -> ~CrustAndSauce() (implicit, since not defined)
+                                -> ~Pizza() // The Pizza base class destructor is called last
+```
+
+
+
+**<u>Oberserver Pattern</u>**
+
+<u>Problem</u>: I want some number of classes to react to updates from data sources, perhaps in different ways.
+
+consider a spreadsheet application. Some number of cells, some number of charts. Change a cell, all charts that depend on that cell update.
+
+Different types of charts redisplay differently.
+
+```c++
+*Subject*																	Observer
+-------------------
++notifyobservers()
++attach(observer*) 
++detach(observer*)
+```
+
+
+
+![IMG_7746](/Users/samzhong/Downloads/IMG_7746.jpg)
+
+1) Concrete Subject has its data updated
+2) Notifyobservers is called (inside or outside subject class)
+3) Notify() is called for each observer in the subjects list
+4) Resolves to calling notify for each concreteObserver
+5) Observer calls getState to receive new data and do its job
+
+
+
+Consider a simplified form of Twitter;
+
+ConcreteSubjects: Tweeters, make a post, followers should be notified
+
+ConcreteObserver: Followers, react on a tweetbeing made.
+
+```c++
+class subject {
+  vector<observer*> observers;
+public:
+  void notifyobservers() const {
+    for (auto p:observers) p->notify();
+  }
+  void attach(observer* o) {
+    observers.emplace-back(o);
+  }
+  void detach(observer* o) {...o from vector}
+  virtual ~subject() = 0;
+};
+
+subject::~subject() {}
+
+class observer{
+public:
+  virtual void notify() = 0;
+  virtual ~observer() {}
+};
+
+class Tweeter:public subject {
+  string lastTweet;
+  ifstring file;
+public:
+  Tweeter(const string& fileName):file{fileName} {} // no need to call subject{}, since it is a default ctor
+  bool tweet() {
+    file >> lastTweet;
+    return file.good();
+  }
+  string getState() const {return lastTweet;}
+};
+
+class Follower:public Observer {
+  string name;
+  Tweeter* iFollow;
+public:
+  Follower(string name, Tweeter* t): name{name}, iFollow{t} {
+    iFollow->attach(this);
+  }
+  void notify() override {
+    string tweet = iFollow->getState();
+    if (tweet.find(name) != string::npos) {
+      cout << "Yay" << endl;
+    } else {
+      cout << "Boo" << endl;
+    }
+  }
+}
+int main() {
+  Tweeter elon{"elon.txt"};
+  Follower we{"we", &elon};
+  Follower mary{"mary", &elon};
+  while (elon.tweet()) {
+    elon.notifyobservers();
+  }
+}
+```
+
+Lec 18
+
+Last time: Observer, Decorator
+
+This time: Exceptions, fatory Method Pattern
+
+
+
+Revisit Vectors
+
+```c++
+v[c] - gets ith element of the vector
+// if i is outside bounds - undefined behavior
+v.at(i) - gets ith element of vector - if i is outside bounds, an error is signalled rather than crashing
+```
+
+- How does error handling work in C?
+
+  - Reserve a value like -1, INT_MIN, etc. Shrinks our return space, what should it be for other types, like Student.
+  - Struct with an error field 
+    - Waste space for most returns
+    - Easy to giniore error field
+  - Use global variable, like <u>error integer</u>; Easy to ignore, may be written if multiple errors
+
+- How to handle errors in C++? - **<u>Exceptions</u>**
+
+  - to signal an error, an exception (exn) can be **raised** or **thrown**
+  - Program then goes to a **handler** or **catch back** to deal with exn. 
+    - No handler found => then program crashes (**std::terminate**)
+
+- If **v.at(i)** has i out of bounds, a **std:**:**out_of_range** exn is thrown Found in **<stdexcept>**
+
+  - Ex:
+
+  ```c++
+  vector<int> v{1,2,3};
+  try { // this is used when u think it has some errors 
+    int n = v.at(100); // this throws an exception and immediately jumping to catch
+    cout << n << endl; // so never get excecute in this case
+  } catch (out_of_range r) { // what types of exception you want to handle (r); catch must pair with try block
+    cout << "Error" << r.what() << endl; // what is return string decribing what the error occur
+  }
+  
+  out_of_range is just an object,
+  .what() is a method that returns a string describes the error that occurred.
+  ```
+
+  ```c++
+  void h() {g();}
+  void g() {h();}
+  void f() {throw out_of_range{"f throw"};} // creating an object; Return by what() - run ctor
+  // control flow transfers from f directly to the catch block. In doing so, we perform stack unwinding
+  
+  int main() {
+    try {
+      h();
+    } catch (out_of_range r) {
+      cout << r.what() << endl;
+    }
+  }
+  ```
+
+  - control flow transfers from f directly to the catch block. In doing so, we perform **<u>stack unwinding</u>**
+    - In doing so, local variables in f, g and h are destroyed.
+
+- Sometimes, we want to catch handler to perform some work, and then raise a new exn
+
+```c++
+try {....}
+catch (out_of_range r) {
+  // Do work, change vector, etc.
+  throw invalid_argument{"Reprompt input"};
+}
+
+we can reraise an exn as well;
+try {...}
+catch (out_of_range r) {
+  // Do some work;
+  throw;
+}
+```
+
+- Why **throw;** instead of **throw r;**?
+
+  - **Inheritance**
+
+  - ```
+    Error Situation
+    			^
+    			|
+    Special Error
+    ```
+
+    
+
+```c++
+try {....}
+catch (errorSituation& e) {
+  throw e; // If e is an ErrorSituation, this is fine.
+} // If e is a specialError, then because throw e; performs a copy, object slicing occurs
+```
+
+- Whereas throw; does not copy -> <u>No object slicing.</u>
+
+- In C++ exception handling, especially in the context of object slicing.
+
+1. **`throw e;` - Copy and Potential Object Slicing:** In the code snippet you provided, if `e` is an instance of a derived class (like `specialError` which is derived from `errorSituation`), using `throw e;` will indeed cause object slicing. This happens because `throw e;` creates a copy of `e`, but only as its base class type (`errorSituation`). As a result, any additional information or properties that were part of the derived class (`specialError`) will be lost. This can lead to loss of information and potentially incorrect exception handling further up the call stack.
+2. **`throw;` - No Copy, Preserving the Exact Exception:** On the other hand, using `throw;` in the catch block will rethrow the original exception object that was caught. This does not involve creating a new object or copying; it simply propagates the existing exception object. Therefore, it preserves the exact type of the exception, including any additional information if it's a derived class instance. This is crucial for accurate and effective exception handling, especially in complex systems where exceptions can be of various derived types with additional context or data.
+
+- Can we write a genral handler? 
+
+  - Yes, using **catch-all syntax**
+
+  - ```c++
+    try{...}
+    catch(...) {...} // dots means catch all
+    ```
+
+- Although we usually throw objects, you can throw anything, including **primitives** like **int**, and your own types.
+
+- You may also create your own exn types:
+
+```c++
+class BadInput{};
+try {throw BadInput{};}
+catch (BadInput & b) {...}
+```
+
+- Advice: throw by value, catch by reference, prevents object slicing.
+- If we call new and OS rejects request for more memory -> **std::bad_alloc** is thrown
+- Advice: **Do not let <u>dtors</u> throw an exception!** 
+  - **<u>Dtors</u>** have an implicit tag called noexcept -> if you throw, program immediately crashes! (**std::terminate**)
+- If we tag our dtor as noexcept(false), it wont immediately crash.
+  - However, can cause an issue with **stack unwinding**
+  - **RULE**: At any time, we may only have one active exn;
+
+- During stack unwinding, dtors run for stack allocated objects. This can cause two exns:
+  1. The original exn that started unwinding
+  2. Exn thrown from dtor.
+
+
+
+**Factory Method Pattern**
+
+<u>Problem</u>: Want to create different version of objects based on policies that should be easily customizable. 
+
+Ex: Enemy and level generation![IMG_7777](/Users/samzhong/Downloads/IMG_7777.jpg)
+
+
+
+
+
+<u>Normal levels</u> generate mostly Turtles, a feew Bosses
+
+<u>Hard levels</u>: mostly bosses, some Turtles
+
+```c++
+class Level {
+public:
+  virtual Enemy* getEnemy() = 0;
+  virtual ~Level() {}
+};
+
+class Normal:public Level {
+public:
+  Enemy* getEnemy() override {
+    // mostly turtles, some bosses
+  }
+};
+
+class Hard:public Level {
+ public:
+  Enemy* getEnemy() override {
+    // mostly bosses, some turtles
+  }
+};
+
+Level* l = ...;
+Enemy* e = l->getEnemy();
+// Use e and l, use their public methods.
+// Easy to add newLevels, new Enemies, and new policies for making enemies
+// Sometimes called virtual ctor pattern
+```
+
+
+
+**Template Method Pattern**
+
+- Not related to C++ templates, just the name
+- Problem: what if i only want **some behavior** that is <u>customizable</u> in the **subclasses**, **not all**
+- Ex. Draing Turtles - red and green
+
+![IMG_7778](/Users/samzhong/Downloads/IMG_7778.jpg)
+
+```c++
+class Turtle {
+  void drawHead() {}
+  void drawLeg() {}
+  virtual void drawShell() = 0;
+}
+
+public:
+	void draw() {
+    drawHead();
+    drawShell();
+    drawLegs();
+  }
+```
+
