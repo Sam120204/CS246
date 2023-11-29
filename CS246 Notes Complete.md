@@ -3125,7 +3125,7 @@ Enemy* e = l->getEnemy();
 class Turtle {
   void drawHead() {}
   void drawLeg() {}
-  virtual void drawShell() = 0;
+  virtual void drawShell() = 0; // private pure virtual method
 }
 
 public:
@@ -3134,5 +3134,749 @@ public:
     drawShell();
     drawLegs();
   }
+};
+
+class RedTurtle : public Turtle {
+  void drawShell() override { //draw red shell }
+}
+  
+class GreenTurtle : public Turtle {
+  void drawShell() override { //draw green shell }
+}
+  
+// Ifwe call draw a Turtle*;
+call Turtle::drawHead,
+  (Red/ Green) Turtle::drawShell
+  Turtle::drawLegs()
+```
+
+- What is the purpose of public methods?
+  - Provide an interface to clients - with invariants, pre/post conditions, and a description of what the method does.
+- Purpose of virtual methods - "an interface" for subclasses to override and change behaviour.
+- What about **<u>public virtual methods</u>**? - sort of **<u>contradictory</u>** - they promise behavior to clients, while <u>giving subclasses power to change behavior.</u>
+
+- No guarantee subclasses will respect invariants when <u>overriding</u>.
+- **<u>Template Method Pattren</u>** may be generalized into non-virtual Idian (NVI)
+
+
+
+NVI States
+
+1. Public methods should be non-virtual
+2. Virtual methods should be private or protected
+3. Exception: dtor should be public virtual
+
+
+
+```c++
+class DigitalMedia {
+public:
+  virtual void play() = 0;
+};
+
+class DigitalMedia { (with NVI)
+  virtual void doPlay() = 0;
+public:
+	void play() {doPlay();}
+};
+```
+
+- Benefit: **<u>Flexibility</u>**
+  - We can add code that will always run by putting it before/after doPlay() - eg. Copyright, PlayCount, etc.
+  - Can also add more "hooks" for custoization by adding private virtual methods like showCoverArt().
+- All without **<u>changing</u>** **public** **interface**!
+- And nust as fast as before - compiler will optimize out extra function call.
+- Easier to use UVI from the start rather than adding it later.
+
+
+
+**<u>STL Maps (Dictionary)</u>**
+
+Array that can be indexed with different types than integer. Found in <map>
+
+```c++
+map<string, int> m;
+m["abc"] = 2;
+m["def"] = 3;
+cout << m["abc"] << endl; // giving 2
+cout << m["ghi"] << endl; // giving 0
+// if a key is not found, the value is default ctor for objects, or zero-initialized (primitives)
+
+if (m.count("abc")) {...}
+return 0 if key not found, 1 if found.
+  
+m.erase("abc");
+
+Iteration:
+for (auto& p:m) {
+  cout << "Key" << p.first << "value" << p.second << endl;
+}
+
+Type of p -> std::pair<string, int>&
+```
+
+- Pair is just a struct, first stores a string, second is an int. Used a struct, because it is just a callection of data, no invariants to preserve.
+
+
+
+Or use a **structured binding**:
+
+```c++
+for (auto& [key, value]:m) {
+  cout << key << " " << value;
+}
+```
+
+- Used when structs have **<u>public</u>** fields
+
+```c++
+vec v{1,2};
+auto [localX, localY] = v; // localX = 1; localY = 2;
+// This is creating a copy of v
+if:
+auto& [localX, localY] = v;
+// This could change the fields in v
+```
+
+- May also use for stack arrays if size is known;
+
+```c++
+int a[3] = {1,2,3};
+auto [x,y,z] = a;
+```
+
+
+
+What should go in a Module? / How can i tell if code is well-structured?
+
+So fat => one class per module;  Larger programs contain multiple classes and functions per module
+
+
+
+Use **compling + cohesion**
+
+<u>Compling</u>: To what **extent** do modules depend on each other. 
+
+- Low coupling: Simple communication via parameters/ Results
+  - Communication via arrays or structures
+  - Modules affect each other;s control flow;
+  - Modules share global data
+- High coupling: modules have access to each other's implementation (**friend**)
+- Desire: Low coupling, makes program easier to change.
+- Cohesion: How much do the parts of module relates to each other
+  - Low Cohesion: Module parts are unrelated. <utility>
+    - Module parts share a common theme - <algorithm>
+    - Parts of module cooperate to manage lifetime state (road/ open/ write files)
+  - High Cohesion: Parts of a module cooperate to perform one task
+- **Dires: High cohesion**
+  - Strive for low coupling and high cohesion
+  - What about 2 classes that depend on one another.?
+
+```c++
+Does not work::
+class A {
+	int x;
+  B y;
+};
+
+class B {
+  int x;
+  A y;
+};
+
+Because we cannot determine size of A or B
+```
+
+- Break chain of dependencies via a ptr:
+
+```c++
+class B;
+class A {
+  int x; // 4bytes for an int
+  B* y; // 8bytes for a pointer
+}
+class B {
+  int x;
+  A y;
+};
+```
+
+- We cannot forward declare from another module, so A and B <u>must be in the same module</u>
+- Forward declaration is not allowed for object fields or for inheritance
+
+
+
+Consider applying couping + cohesion to TikTacToe
+
+```c++
+class Board {
+public:
+  void play() {...cout <<"YourMove" << endl;...}
+};
+
+Book is coupled with cout - cannot reuse Board without getting print statement
+- What if I want to print to a file? or not print at all?
+```
+
+```c++
+class Board {
+  istream&in;
+  ostream&out;
+public:
+  Board(istream&in, ostream& out):in{in}, out{out} {}
+  void play() {...out<<"Your Move" << endl...}
+};
+```
+
+- Still coupled with streams - What if I want a graphical display? or a web API?
+- Board should not do communication with user
+- **<u>Single Responsibility Principle:</u>** Each class should have exactly one reason to change
+- If changes to 2 different parts of the spec requries changes to the same class, SRP violated
+- Board state + communication these are different things.
+- Where to do communication> in main? **NO**
+- Main function is not reusable like other classes are
+
+
+
+CS 246 - Lecture 20
+
+Last time: Maps, Couping, Cohesion
+
+This time: MVC, Exception Safety, RAII, 
+
+
+
+```c++
+Tic Tac Toe: class Board {
+  ...
+    cout << "Your Move" << endl;
+};
+```
+
+If board should not perform communication, then who? Main? Generally no, main is not reusable
+
+Alternative: Use **<u>MVC</u>** architecture - Model-view-controller
+
+- Model - keeps track of data and logic surrounding data
+- View - Output, communication with a user
+- Controller - manages input, and control flow between model and view
+
+![IMG_7841](/Users/samzhong/Downloads/IMG_7841.jpg)
+
+Model - Keep track of data
+
+- Communicates with controller via parameters / results
+- Sometimes observer relationship between model and views
+- Controller - May encapsulate logic for rules / ..
+- Sometimes input is taken from view if it is a Window
+- MVC promotes reuse of code
+
+
+
+**<u>Exception Safety</u>**
+
+```c++
+// Assume C is a Class
+void f() {
+  C myC{};
+  C* myCptr = new C{};
+  g();
+  delete myCptr;
+}
+
+Does f leak?
+// Depends on g
+```
+
+- If g does not throw -> no leak
+- If g throws -> control is immediately transferred to catch, stack unwinding runs my C dtor, but heap memory is leaked, delete was never called.
+
+```c++
+void f() {
+  C myC{}; 
+  C* myCptr = new C{};
+  try {g();} catch (...) {delete myCptr; throw;}
+  delete myCptr;
+}
+```
+
+- Works, but it is clunky - duplicated code for deleting - have to repeat for any function that may throw - only gets more complex with more ptrs and more function calls
+- We wanted to make sure **delete runs** if we leave f normally. or via exn. Other languages have finally. which always runs. C++ doesnot 
+- Guarantee: Stack allocated object dtors will run dwing stack unwinding.
+
+
+
+**<u>Solution</u>**
+
+- Wrap dynamically allocated memory in a stack allocated object 
+- And in general, prefer to use stack allocated objects
+
+**<u>RAII</u>** **<u>- Resource acquisition is initialization</u>**
+
+Ctor - acquires some resource
+
+Dtor - releases the resource
+
+```c++
+{
+  ifstream f{"file.txt"}; // file is accquired in ctor
+} // file closed in dtor
+
+std::unique-ptr<T> found in <memory> is an RAII class that manages dynamic memory
+  Ctor - takes in a T*
+  Dtor - deletes it for you
+    
+void f() {
+    C myC{};
+    unique_ptr<C> myCptr{new C{}};
+    g(); // No leaks, whether we leave normally or via exn
+  }
+```
+
+OR:
+
+Use make-unique
+
+```c++
+unique_ptr<C> myCptr = std::make_unique<C>(...);
+make_unique creates a C object in the heap for you using new, and the args you give to make_unique
+```
+
+What happens if we copy?
+
+```c++
+auto p = make_unique<C>(...);
+unique_ptr<C> q = p;  // Cpy Ctor for unique_ptrs
+```
+
+- Copy Ctor and Copy assignment - disabled for unique_ptr - code wont compile if we invoke them.
+- If we pointed them at same location (shallow copy) -> double delete
+- If deep copy, then pointer is meaningless
+
+```c++
+template <typename T> class unique_ptr {
+  T* ptr;
+public:
+  explicit unique_ptr(T* ptr):ptr{ptr} {}
+  ~unque_ptr() {delete ptr;}
+  unique_ptr(const unique_ptr<T>& other) = delete;
+	unique_ptr<T>& operator=(const unique_ptr<T>& other) = delete;
+  unique_ptr(unique_ptr<T>&& other):ptr{other.ptr} {
+    other.ptr = nullptr;
+  }
+  unique_ptr<T>& operator=(unique_ptr<T>&& other) {
+    delete pre;
+    ptr = other.ptr;
+    other.ptr = nullptr;
+    return *this;
+  }
+  T& operator*() {return *ptr;}
+};
+```
+
+- If I need to copy a ptr: what should I do?
+
+  - First answer: who is in charge of ownership?
+  - Whoever owns the memory gets the unique_ptr
+  - Everyone who just uses memory, access via **<u>raw ptrs</u>** - can get those via p.get()
+
+- New understanding of ownership - can be signalled via type
+
+- Unique_ptr - represents ownership, associated memory is deleted when it goes out of scope
+
+- Raw ptrs - represent non-ownership, default is they do not free memory when they go out of scope
+
+- **Moving** unique_ptr - **<u>Transfer</u>** of **<u>ownership</u>**
+
+- ```c++
+  //Parameters
+  void f(unique_ptr<C> p) - f takes ownership of the unique_ptr - deleted when f finishes
+  void g(*p) - ownership is not transferred from caller to g - g should just use p, not delete it
+  ```
+
+  
+
+- Results: 
+
+  ```C++
+  unique_ptr<C> f() - returns always move - ptrs is now owned by the caller
+  C* g() - caller should not delete returned value - stack memory, or owned by someone else.
+  ```
+
+  
+
+- Rarely, we may need true shared ownership - consider a graph data structure
+
+- In such a case, we can use shared ptrs
+
+- ```c++
+  {
+    auto p = make_shared<C> {...}
+    if (...) {
+      auto q = p;
+    } // q goes out of scope, does not delete p exists
+  } // p goes out of scope, nobody points at C object anymore, deleted.
+  ```
+
+  
+
+- Shared_ptrs work by maintaing a <u>reference count</u> on creation, incremented. On deletion, decremented. When it reaches O, underlying object.
+
+
+
+CS 246 - Lec 21
+
+Last time: MVC,  Exn, Safety. RAII, Smart ptrs
+
+This time: Exn. Safety, vectors, casting
+
+
+
+What is **exn safety**
+
+- It is not that a function never throws, or that it handles all exes internally
+- It is about guarantees we are given if we call a function and it throws or exn at us
+
+1. Basic Guarantee - if an exn is thrown from a function f - then program is in a valid but unspecified state class invariants maintained, no leaks, no data corruption, but thats it
+
+2. Strong guarantee - if an exn is thrown from f - then program state is reverted to **before function call.**
+
+   i.e. - it is as if you never called f in the first place
+
+3. Nothrow guarantee - if we call f, it will never throw and it will always do its job.
+
+```c++
+class C {
+  A a;
+  B b;
+public:
+  void f() {
+    a.g();
+    b.h();
+  }
+};
+```
+
+- Lets assume both A::g and B::h both provide **strong guarantee**.
+
+- If **a.g() throws**
+  - it undoes any side effects - so it is as if f was never called.
+- If **b.h() throws**
+  - it undo any of its own side effects, but it cannot undo a.g()'s work => **basic guarantee**
+
+Since C::f has basic guarantee, can we change it to provide **<u>strong guarantee</u>**?
+
+- Idea: Use temporary values, that way if we throw, a and b aren't changed. Must assume a.g() and b.h() have only local side effects for this to work.
+
+```c++
+class C {
+  A a;
+  B b;
+public:
+  void f() {
+    A atemp = a; B btemp = b;
+    atemp.g(); btemp.h(); // if either throws, a and b never change
+    a = atemp;
+    b = btemp;
+  }
+}
+```
+
+- This leaks like it provides strong guarantee, but if <u>b = bTemp</u> throws, we are modified a already - just basic guarantee.
+- We need the ability to set a and b w/out throwing
+
+Use pimples or (pointer to implmenetation) idiom. Then, swapping pointers - guaranteed to be nothrow.
+
+```c++
+struct cImpl{
+	A a;
+	B b;
+}
+
+class C{
+	unique_ptr<cImpl> pImpl;
+public:
+	void f(){
+		auto temp = make_unique<cImpl>(*pImpl);
+		temp->a.g(); // strong guarantee
+		temp->b.h(); // strong guarantee
+		std::swap(pImpl, temp); // no throw
+	}
+};
+// if either A::g, B::h offer no exception safety, then in general, C::f can't
+// Exception Safety: The use of make_unique to create a temporary cImpl object ensures that if either temp->a.g() or temp->b.h() throws an exception, the original state of C (held by pImpl) remains untouched. Furthermore, std::swap for unique pointers is guaranteed to be no-throw, so the final step of swapping pImpl with temp doesn't risk throwing an exception. This provides a strong exception safety guarantee.
+```
+
+
+
+Vectors - RAII, Exn. safety
+
+Vector<C> v - represents ownership of C objects - when dtor runs for v when it goes out of scope - C objects are deleted, No Polymorphism!
+
+Subclasses inserted into V will be sliced:
+
+vector<C*> w - repressents non-ownership, when w goes out of scope - dtor will not delete what is pointed to by the C *''s. Supports polyphirsm - we can point subclass ptrs in the vector
+
+```c++
+vector<unique_ptr<C>> u - when u goes out of scope, dtor runs, frees associated memory - ownership, and allows polymorphism.
+```
+
+- Vectors and exn. safety
+
+  - ```c++
+    vector<T>: emplace_back - supports strong guarantee. If it throws, dynamically allocated array inside the vector is unchanged.
+    ```
+
+  - What happens when size == capacity>
+
+    - Allocate new array W/ 2X capacity
+    - copy each object from old array to new array if one throws, delete new array and rethrow
+    - Point our old array ptr at the new array
+
+- This is a little inefficient - why not move instead of copy?
+
+  - Allocate new array
+  - use move ctor to move each object to new array
+  - Reassign array ptrs
+
+- Does not provide strong guarantee - if a move ctor throws, our original array has been modified, because we stole data
+
+- If move ctor will not throw will not throw - compiler will move elements in the vector rather than copy
+
+- if move ctor may throw - compiler will resize vectors via copying
+
+- At a minimum, moves and swaps should provide nothrow guarantee - tag them noexcept so compiler can facilitate optimizations:
+
+- ```c++
+  class C {
+    C(C&& other) noexcept;
+    C& operator=(C&& other) noexcept;
+  }
+  ```
+
+  
+
+
+
+**Casting:**
+
+```c++
+Node n;
+int* ip = (int*) &n; // forces Node* to be treated as an int*
+// This is C-style casting, not recommended in C++ dangerous, not type-safe
+// C++ instead provides 4 casting functions for different situations.
+```
+
+1. Static_cast - for "sensible casts" with well-defined semantics. <u>Float->int</u>
+
+```c++
+float f; 
+void g(int x); 
+void g(float f); 
+g(static_cast<int>(f)); - calls int version of g
+```
+
+Static_cast allows us to downcast - 
+
+```c++
+superclass* -> subclass*
+Book* pb = ...;
+Text* pt = static_cast<Text*>(pb);
+cout << pt->topic << endl;
+```
+
+
+
+
+
+CS 246 - Lec 22
+
+1. Static-cast - sensible, well-defined casts
+2. Const-cast - Allows you to remove const from a type
+
+```c++
+void f(int*p) // Assume f does not modify the int p points to
+void g(const int* p) {
+  f(p); // wont compile
+  f(const_cast<int*>(p)); // will compile
+}
+// If f changes p-undefined behavior
+```
+
+3.  Reinterpret_cast_cast - take memory and reinterpret the bits stored there as a different type
+
+```c++
+Turtle t;
+student* s = reinterpret_cast<student*>(&t); // Will point to the same memory location
+// Behaviour depends on compiler and object layouts
+// Gnerally unsafe
+```
+
+4. Dynamic_cast - Let us check which subclass I am pointing to
+
+- Only works if you have at **<u>least</u>** **<u>one</u>** **<u>virtual</u>** method
+
+```c++
+Book* bp = ..; // super class
+Text* tp = dynamic_cast<Text*>(bp);
+// If bp points at a Text, tp will point at that same Text object
+Otherwise - tp is set to nullptr
+  
+if (tp) cout << "Text" << endl;
+else cout << "Not a Text" << endl;
+```
+
+5. We can also cast from shared_ptrs to other
+
+```c++
+ share_ptrs. In <memory>
+static_pointer_cast, dynamic_pointer_cast, const_pointer_cast, reinterpret_pointer_cast
+```
+
+6. Dynamic cast references:
+
+```c++
+Book& br = ..;
+Text& tr = dynamic_cast<Text&>(br); // since there is null reference, so instead, the std::bad_cast exception is thrown
+```
+
+Recall polymorphic assignment problem:
+
+- If operator= is non-virtual: partial assignment
+- If operator= is virtual: mixed assignment
+- Recall: signiture of virtual operator=
+
+```c++
+Text t1{...}, t2{...};
+Book& r1 = t1;
+Book& r2 = t2;
+r1 = r2;
+
+Text& Text::operator=(const Book& other){
+  if (this == &other) return *this;
+  const Text& tother = dynamic_cast<const Text&>(other);
+  Book::operator=(tother);
+  topic = tother.topic;
+  return *this;
+}
+```
+
+
+
+7. is dynamic_cast good style?
+
+With dynamic_cast, we can make decisions based on the runtime type information of an object (RTTI)
+
+- Tightly capled to book hierarchy - If I add a subclass, must add another else-if. This must be done everywhere I do this pattern
+- If I miss one, it is a bug
+- If dynamic_cast a bad style?
+  - Depends on use
+  - Use in Text::operator= does not need changing if we add more subclass types
+
+```c++
+void whatIsIt(shared_ptr<Book>b) {
+  if (dynamic_pointer_cast<Text>(b)) cout << "Text";
+  else if (dynamic_pointer_const<comic>(b)) cout << "Comic";
+  else cout << "regular book";
+}
+```
+
+- Fix whatIsIt via virtual method
+
+```c++
+class Book {
+public:
+  virtual void identify() {cout<<"BOOK"<<endl;}
+};
+
+class Text:public Book {
+public:
+  void identify() override {cout << "Text" <<endl;}
+};
+
+void whatIsIt(book* b) {
+  if (b) b->identify();
+  else cout << "Nothing";
+}
+```
+
+- We were able to use this solution of identify
+  - There are a high number of possible Book subtypes and we want to add new ones with ease
+  - Books can have a uniform interface, subclass behaviour does not deviate too much
+
+- What about opposite scenario
+  - Consider we know subclass types in advance and we are Ok that adding new subclasses will require extensive code changes
+  - Subclasses may not conform a uniform interface - each way have significantly differenting behavior
+
+```c++
+class Turtle:public Enemy {
+  void stealshell();
+};
+
+class Boss:public Enemy {
+  void epicBossBattle();
+};
+```
+
+- Adding new enemies will requrie large changes as each may have unique behavior - so maybe dynamic_casting is not so bad.
+  - another option is using std::variant
+- Variant
+  - found in <variant> acts as a type-safe union;
+
+```c++
+using Enemy = variant<Turtle, Boss>; // type alias - Enemy means variant<Turtle, Boss>;
+Enemy e {Turtle{...}} 
+// or
+Enemy e {Boss{...}}
+
+if(holds_alternative<Boss>(e)) {
+  // it is a boss
+} else {...}
+// Access value
+try {
+  Turtle t = get<Turtle>(e);
+} catch(std::bad_variant_access&  ) {..}
+
+// If variant is left uninitialized - eg Enemy e;
+default construct first type in variant list.
+Wont compile if first type is not default constructable
+```
+
+- IF first type does not have a default ctor:
+
+  1. Add a default ctor
+  2. Reorder types so first has a default ctor
+  3. Use std::monostate - represents empty
+
+  e.g. 
+
+  ```c++
+  using Enemy = variant<monostate, Turtle, Boss>;
+  ```
+
+  4. ```c++
+     std::optional<T> = variant<monostate, T>
+     ```
+
+
+
+**<u>How do virtual methods actually work?</u>**
+
+```c++
+struct vec {
+  int x, y;
+  void f();
+};
+
+struct vec2 {
+  int x,y;
+  virtual void f(); 
+};
+
+// Are the following in different memory?
+vec v;
+vec2 w;
+
+cout << sizeof(int) << sizeof(v) <<sizeof(w); // 4 8 16
 ```
 
