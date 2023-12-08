@@ -3880,3 +3880,174 @@ vec2 w;
 cout << sizeof(int) << sizeof(v) <<sizeof(w); // 4 8 16
 ```
 
+- Classes with no virtual functions, **their objects's size is just the size of fields** - no space is taken up by f.
+- Vec2 takes up more space. Why?
+
+
+
+```c++
+Book* bp = new Text/Comic/Book
+bp->isHeavy(); // the call is done depending on the dynamic type, i.e. - we call the method based on the type bp is pointing to
+```
+
+- Any object that corresponds to a class with **virtual** **methods** also contains a ptr(**virtual ptr**)
+- vptr points to the vtable - which contains function ptrs to the methods of the class
+
+```c++
+class C {
+  int x, y;
+  virtual void f();
+  virtual void g();
+  void h();
+  virtual ~C();
+};
+```
+
+vptr & stable:![IMG_7897](/Users/samzhong/Downloads/IMG_7897.jpg)
+
+
+
+E.g Book/Text
+
+![IMG_7899](/Users/samzhong/Downloads/IMG_7899.jpg)
+
+
+
+![IMG_7900](/Users/samzhong/Downloads/IMG_7900.jpg)
+
+```c++
+Book* bp = new Text/Comic/Book
+bp->isHeavy(); // goes to vtable and find isHeavy entry and jumps to that function pointer
+```
+
+- What instructions does compiler generate?
+
+  1) Follow vptr to vtable
+  1) Find corresponding entry in vtable
+  1) Jump to that function pointer;s location - this happens at runtime
+
+- Virtual functions are **<u>slower</u>** than non-virtual functions because they require a vtable lookup
+- Additionally, objects corresponding to classes with virtual functions are larger due to the vptr (8 bytes)
+
+
+
+- Why do we put vptr at the top of the object?
+
+```c++
+class A {
+  int x;
+};
+
+class B : public A {
+  int y;
+};
+
+B* bp = new B;
+A* ap = bp;
+```
+
+![IMG_7901](/Users/samzhong/Downloads/IMG_7901.jpg)
+
+
+
+- To create an **A*** pointing at a B object, just point to same location and will ignore fields below B objects "Look-like" A objects if you ignore B fields
+
+
+
+
+
+**<u>Multiple Inheritance</u>**
+
+```c++
+struct A {int a;};
+struct B {int b;};
+struct C:public A, public B {int c;};
+C cobject;
+cout MM cobject.a << " " << cobject.b << endl;
+
+challenge: shared ancenstor
+struct A {int a;};
+struct B : public A {int b;};
+struct C : public A {int c;};
+struct D : public B, public C {
+  int d;
+};
+
+D dobject;
+cout << dobject.a << endl; // THIS WONT COMPILE!!!!
+// D has TWO a field, because B and C both inherits from A class
+// That leads to ambiguous!!!!
+// improves:
+dobject.B::a or dobject.C::a
+```
+
+![](/Users/samzhong/Downloads/IMG_7902.jpg)
+
+- What if I want just one copy of my a fields?
+  - Using virtual inheritance!!!
+- Deadly diamond of death ![IMG_7903 2](/Users/samzhong/Downloads/IMG_7903 2.jpg)
+
+```c++
+struct B: public virtual A {...};
+struct C: public virtual A {...};
+```
+
+- In D, the A fields are shared rather than duplocated - **dobject.a** - works!!!!
+
+
+
+What about object layout?
+
+```c++
+D object:
+vptr
+--------
+A fields
+--------
+B fields
+--------
+C fields
+--------
+D fields
+
+What happen if we create an A*, B* or C* to this object?
+  
+A object:
+vptr
+-------
+A fields
+  
+B object:
+vptr
+-------
+A fields
+-------
+B fields
+  
+C object:
+vptr
+-------
+A fields
+-------
+C fields
+```
+
+D object:![IMG_7905](/Users/samzhong/Downloads/IMG_7905.jpg)
+
+B object layout:
+
+![IMG_7906](/Users/samzhong/Downloads/IMG_7906.jpg)
+
+
+
+- To locate a fields, use the vtable, it stores the distance to the fields for its obejct
+- This is where virtual inheritance gets its name
+- What if I want on A* pointing at a D object?
+- Pointer adjustment occurs with virtual inheritance.
+
+```c++
+D dobject;
+A* ap = &dobject; // points to the A subobject in D
+// !!!This adjustment occurs with assignment, static/dynamic casting but not reinterpret cast
+```
+
